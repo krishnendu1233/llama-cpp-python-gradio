@@ -8,25 +8,36 @@ import base64
 __version__ = "0.0.1"
 
 
-def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, **model_kwargs):
+def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, chat_format: str = None, **model_kwargs):
+    """
+    Available chat formats:
+    - "llama-2": Llama 2 chat format
+    - "chatml": ChatML format (used by mistral/mixtral)
+    - "openchat": OpenChat format
+    - "vicuna": Vicuna chat format
+    - "openbuddy": OpenBuddy chat format
+    - "neural-chat": Intel neural chat format
+    - "zephyr": Zephyr chat format
+    - None: No chat format (use for instruction models)
+    """
+    # Initialize model once, outside the fn function
+    llm = Llama(
+        model_path=model_path,
+        chat_format=chat_format,
+        **model_kwargs
+    )
+    
     def fn(message, history):
         inputs = preprocess(message, history)
-        llm = Llama(model_path=model_path, **model_kwargs)
-        
-        # Add a system message if not present
-        if not inputs["messages"] or inputs["messages"][0]["role"] != "system":
-            inputs["messages"].insert(0, {
-                "role": "system",
-                "content": "You are a helpful AI assistant. Please provide direct and clear answers."
-            })
         
         # Create chat completion with streaming
         completion = llm.create_chat_completion(
             messages=inputs["messages"],
             stream=True,
-            chat_format="chatml",  # Use chatml format which matches the <|im_start|> format
             temperature=0.7,
-            stop=["<|im_end|>"]  # Add explicit stop token
+            top_p=0.95,
+            top_k=40,
+            repeat_penalty=1.1
         )
         
         response_text = ""
