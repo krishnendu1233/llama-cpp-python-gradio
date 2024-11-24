@@ -101,22 +101,31 @@ def get_model_path(name: str = None, model_path: str = None) -> str:
     if model_path:
         return model_path
     
-    # Default model mapping with repo_id and filename patterns
-    model_mapping = {
-        "llama-3.1-8b-instruct": {
-            "repo_id": "TheBloke/Llama-2-7B-Chat-GGUF",
-            "filename": "llama-2-7b-chat.q4_K_M.gguf"
-        }
-    }
+    if name:
+        # Split name into username and model_id if provided in format "username/model-id"
+        if "/" in name:
+            repo_id = name
+            filename = "model.gguf"  # Default filename
+        else:
+            # Fallback to legacy model mapping for backward compatibility
+            model_mapping = {
+                "llama-3.1-8b-instruct": {
+                    "repo_id": "TheBloke/Llama-2-7B-Chat-GGUF",
+                    "filename": "llama-2-7b-chat.q4_K_M.gguf"
+                }
+            }
+            if name not in model_mapping:
+                raise ValueError(f"Unknown model name: {name}")
+            config = model_mapping[name]
+            repo_id = config["repo_id"]
+            filename = config["filename"]
+        
+        return hf_hub_download(
+            repo_id=repo_id,
+            filename=filename
+        )
     
-    if name not in model_mapping:
-        raise ValueError(f"Unknown model name: {name}")
-    
-    config = model_mapping[name]
-    return hf_hub_download(
-        repo_id=config["repo_id"],
-        filename=config["filename"]
-    )
+    raise ValueError("Either name or model_path must be provided")
 
 
 def registry(name: str = None, model_path: str = None, **kwargs):
