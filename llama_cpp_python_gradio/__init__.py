@@ -102,31 +102,33 @@ def get_model_path(name: str = None, model_path: str = None) -> str:
         return model_path
     
     if name:
-        # Split name into username and model_id if provided in format "username/model-id"
         if "/" in name:
             repo_id = name
-            # Try common GGUF filenames, prioritizing Q8_0 variants
-            common_filenames = [
-                f"{name.split('/')[-1]}-Q8_0.gguf",  # e.g., Marco-o1-Q8_0.gguf
-                "Q8_0.gguf",
-                "model-Q8_0.gguf",
-                "model.gguf",
-                "ggml-model-q4_0.gguf",
-                "ggml-model-q4_k_m.gguf",
-                "model-q4_K_M.gguf"
-            ]
-            
-            for filename in common_filenames:
-                try:
+            try:
+                # List all files in the repo
+                from huggingface_hub import list_repo_files
+                files = list_repo_files(repo_id)
+                
+                # First try to find quantized versions (Q8 preferred, then Q6, then Q4)
+                for prefix in ['Q8', 'Q6', 'Q4']:
+                    quantized = [f for f in files if prefix in f and f.endswith('.gguf')]
+                    if quantized:
+                        return hf_hub_download(
+                            repo_id=repo_id,
+                            filename=quantized[0]
+                        )
+                
+                # Fallback to any .gguf file
+                gguf_files = [f for f in files if f.endswith('.gguf')]
+                if gguf_files:
                     return hf_hub_download(
                         repo_id=repo_id,
-                        filename=filename
+                        filename=gguf_files[0]
                     )
-                except Exception:
-                    continue
                     
-            raise ValueError(f"Could not find a GGUF model file in repository {repo_id}. "
-                           f"Tried filenames: {', '.join(common_filenames)}")
+                raise ValueError(f"Could not find any GGUF model file in repository {repo_id}")
+            except Exception as e:
+                raise ValueError(f"Error accessing repository {repo_id}: {str(e)}")
         else:
             # Fallback to legacy model mapping for backward compatibility
             model_mapping = {
