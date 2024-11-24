@@ -1,90 +1,53 @@
-# `openai-gradio`
+# `llama-cpp-python-gradio`
 
-is a Python package that makes it very easy for developers to create machine learning apps that are powered by OpenAI's API.
+is a Python package that makes it easy for developers to create machine learning apps powered by llama.cpp models using Gradio.
 
 # Installation
 
-You can install `openai-gradio` directly using pip:
+You can install `llama-cpp-python-gradio` directly using pip:
 
 ```bash
-pip install openai-gradio
+pip install llama-cpp-python-gradio
 ```
-
-That's it! 
 
 # Basic Usage
 
-Just like if you were to use the `openai` API, you should first save your OpenAI API key to this environment variable:
-
-```
-export OPENAI_API_KEY=<your token>
-```
-
-Then in a Python file, write:
+First, you'll need a GGUF model file for llama.cpp. Then in a Python file, write:
 
 ```python
 import gradio as gr
-import openai_gradio
+import llama_cpp_python_gradio
 
 gr.load(
-    name='gpt-4-turbo',
-    src=openai_gradio.registry,
+    model_path='path/to/your/model.gguf',
+    src=llama_cpp_python_gradio.registry,
 ).launch()
 ```
 
-Run the Python file, and you should see a Gradio Interface connected to the model on OpenAI!
-
-![ChatInterface](chatinterface.png)
+Run the Python file, and you should see a Gradio Interface connected to your local llama.cpp model!
 
 # Customization 
 
-Once you can create a Gradio UI from an OpenAI endpoint, you can customize it by setting your own input and output components, or any other arguments to `gr.Interface`. For example, the screenshot below was generated with:
-
-```py
-import gradio as gr
-import openai_gradio
-
-gr.load(
-    name='gpt-4-turbo',
-    src=openai_gradio.registry,
-    title='OpenAI-Gradio Integration',
-    description="Chat with GPT-4-turbo model.",
-    examples=["Explain quantum gravity to a 5-year old.", "How many R are there in the word Strawberry?"]
-).launch()
-```
-![ChatInterface with customizations](chatinterface_with_customization.png)
-
-# Composition
-
-Or use your loaded Interface within larger Gradio Web UIs, e.g.
+You can customize the interface by passing additional arguments to the Llama constructor:
 
 ```python
 import gradio as gr
-import openai_gradio
+import llama_cpp_python_gradio
 
-with gr.Blocks() as demo:
-    with gr.Tab("GPT-4-turbo"):
-        gr.load('gpt-4-turbo', src=openai_gradio.registry)
-    with gr.Tab("GPT-3.5-turbo"):
-        gr.load('gpt-3.5-turbo', src=openai_gradio.registry)
-
-demo.launch()
+gr.load(
+    model_path='path/to/your/model.gguf',
+    src=llama_cpp_python_gradio.registry,
+    n_ctx=2048,  # context window size
+    n_gpu_layers=1  # number of layers to offload to GPU
+).launch()
 ```
 
 # Under the Hood
 
-The `openai-gradio` Python library has two dependencies: `openai` and `gradio`. It defines a "registry" function `openai_gradio.registry`, which takes in a model name and returns a Gradio app.
+The `llama-cpp-python-gradio` library has two main dependencies: `llama-cpp-python` and `gradio`. It provides a "registry" function that creates a Gradio ChatInterface connected to your local llama.cpp model.
 
-# Supported Models in OpenAI
-
-All chat API models supported by OpenAI are compatible with this integration. For a comprehensive list of available models and their specifications, please refer to the [OpenAI Models documentation](https://platform.openai.com/docs/models).
+The interface supports both text and image inputs (for multimodal models), with automatic handling of file uploads and base64 encoding.
 
 -------
 
-Note: if you are getting a 401 authentication error, then the OpenAI API Client is not able to get the API token from the environment variable. This happened to me as well, in which case save it in your Python session, like this:
-
-```py
-import os
-
-os.environ["OPENAI_API_KEY"] = ...
-```
+Note: Make sure you have a compatible GGUF model file before running the interface. You can download models from sources like Hugging Face or convert existing models to GGUF format.
