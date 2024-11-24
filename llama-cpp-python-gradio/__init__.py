@@ -1,5 +1,6 @@
 import os
 from llama_cpp import Llama
+from huggingface_hub import hf_hub_download
 import gradio as gr
 from typing import Callable
 import base64
@@ -95,6 +96,29 @@ def get_pipeline(model_name):
     return "chat"
 
 
+def get_model_path(name: str = None, model_path: str = None) -> str:
+    """Get the local path to the model, downloading it from HF if necessary."""
+    if model_path:
+        return model_path
+    
+    # Default model mapping with repo_id and filename patterns
+    model_mapping = {
+        "llama-3.1-8b-instruct": {
+            "repo_id": "TheBloke/Llama-2-7B-Chat-GGUF",
+            "filename": "llama-2-7b-chat.q4_K_M.gguf"
+        }
+    }
+    
+    if name not in model_mapping:
+        raise ValueError(f"Unknown model name: {name}")
+    
+    config = model_mapping[name]
+    return hf_hub_download(
+        repo_id=config["repo_id"],
+        filename=config["filename"]
+    )
+
+
 def registry(name: str = None, model_path: str = None, **kwargs):
     """
     Create a Gradio Interface for a llama.cpp model.
@@ -104,19 +128,8 @@ def registry(name: str = None, model_path: str = None, **kwargs):
         - model_path (str, optional): Path to the GGUF model file
         - kwargs: Additional arguments passed to Llama constructor
     """
-    if name and not model_path:
-        # Add logic here to map model names to paths
-        # This is just an example - you should implement your own mapping
-        model_mapping = {
-            "llama-3.1-8b-instruct": "path/to/llama-3.1-8b-instruct.gguf"
-        }
-        if name not in model_mapping:
-            raise ValueError(f"Unknown model name: {name}")
-        model_path = model_mapping[name]
+    model_path = get_model_path(name, model_path)
     
-    if not model_path:
-        raise ValueError("Either name or model_path must be provided")
-
     pipeline = "chat"  # Currently only supporting chat models
     inputs, outputs, preprocess, postprocess = get_interface_args(pipeline)
     fn = get_fn(model_path, preprocess, postprocess, **kwargs)
