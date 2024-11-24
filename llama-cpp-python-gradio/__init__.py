@@ -105,7 +105,28 @@ def get_model_path(name: str = None, model_path: str = None) -> str:
         # Split name into username and model_id if provided in format "username/model-id"
         if "/" in name:
             repo_id = name
-            filename = "model.gguf"  # Default filename
+            # Try common GGUF filenames, prioritizing Q8_0 variants
+            common_filenames = [
+                f"{name.split('/')[-1]}-Q8_0.gguf",  # e.g., Marco-o1-Q8_0.gguf
+                "Q8_0.gguf",
+                "model-Q8_0.gguf",
+                "model.gguf",
+                "ggml-model-q4_0.gguf",
+                "ggml-model-q4_k_m.gguf",
+                "model-q4_K_M.gguf"
+            ]
+            
+            for filename in common_filenames:
+                try:
+                    return hf_hub_download(
+                        repo_id=repo_id,
+                        filename=filename
+                    )
+                except Exception:
+                    continue
+                    
+            raise ValueError(f"Could not find a GGUF model file in repository {repo_id}. "
+                           f"Tried filenames: {', '.join(common_filenames)}")
         else:
             # Fallback to legacy model mapping for backward compatibility
             model_mapping = {
@@ -119,11 +140,11 @@ def get_model_path(name: str = None, model_path: str = None) -> str:
             config = model_mapping[name]
             repo_id = config["repo_id"]
             filename = config["filename"]
-        
-        return hf_hub_download(
-            repo_id=repo_id,
-            filename=filename
-        )
+            
+            return hf_hub_download(
+                repo_id=repo_id,
+                filename=filename
+            )
     
     raise ValueError("Either name or model_path must be provided")
 
