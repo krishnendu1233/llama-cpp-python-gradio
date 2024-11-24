@@ -1,2 +1,3 @@
 llama-cpp-python
 gradio>=5.5.0
+huggingface-hub
