@@ -1,7 +1,7 @@
 import gradio as gr
-import openai_gradio
+import llama_cpp_python_gradio
 
 gr.load(
-    name='gpt-4o-2024-11-20',
-    src=openai_gradio.registry,
+    name='llama-3.1-8b-instruct',
+    src=llama_cpp_python_gradio.registry,
 ).launch()

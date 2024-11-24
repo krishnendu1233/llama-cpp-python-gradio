@@ -1,5 +1,5 @@
 import os
-from openai import OpenAI
+from llama_cpp import Llama
 import gradio as gr
 from typing import Callable
 import base64
@@ -7,20 +7,23 @@ import base64
 __version__ = "0.0.3"
 
 
-def get_fn(model_name: str, preprocess: Callable, postprocess: Callable, api_key: str):
+def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, **model_kwargs):
     def fn(message, history):
         inputs = preprocess(message, history)
-        client = OpenAI(api_key=api_key)
-        completion = client.chat.completions.create(
-            model=model_name,
+        llm = Llama(model_path=model_path, **model_kwargs)
+        
+        # Create chat completion with streaming
+        completion = llm.create_chat_completion(
             messages=inputs["messages"],
-            stream=True,
+            stream=True
         )
+        
         response_text = ""
         for chunk in completion:
-            delta = chunk.choices[0].delta.content or ""
-            response_text += delta
-            yield postprocess(response_text)
+            if chunk.choices[0].delta.content:
+                delta = chunk.choices[0].delta.content
+                response_text += delta
+                yield postprocess(response_text)
 
     return fn
 
@@ -92,26 +95,31 @@ def get_pipeline(model_name):
     return "chat"
 
 
-def registry(name: str, token: str | None = None, **kwargs):
+def registry(name: str = None, model_path: str = None, **kwargs):
     """
-    Create a Gradio Interface for a model on OpenAI.
+    Create a Gradio Interface for a llama.cpp model.
 
     Parameters:
-        - name (str): The name of the OpenAI model.
-        - token (str, optional): The API key for OpenAI.
+        - name (str, optional): Name of the model to load
+        - model_path (str, optional): Path to the GGUF model file
+        - kwargs: Additional arguments passed to Llama constructor
     """
-    api_key = token or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is not set.")
+    if name and not model_path:
+        # Add logic here to map model names to paths
+        # This is just an example - you should implement your own mapping
+        model_mapping = {
+            "llama-3.1-8b-instruct": "path/to/llama-3.1-8b-instruct.gguf"
+        }
+        if name not in model_mapping:
+            raise ValueError(f"Unknown model name: {name}")
+        model_path = model_mapping[name]
+    
+    if not model_path:
+        raise ValueError("Either name or model_path must be provided")
 
-    pipeline = get_pipeline(name)
+    pipeline = "chat"  # Currently only supporting chat models
     inputs, outputs, preprocess, postprocess = get_interface_args(pipeline)
-    fn = get_fn(name, preprocess, postprocess, api_key)
+    fn = get_fn(model_path, preprocess, postprocess, **kwargs)
 
-    if pipeline == "chat":
-        interface = gr.ChatInterface(fn=fn, multimodal=True, **kwargs)
-    else:
-        # For other pipelines, create a standard Interface (not implemented yet)
-        interface = gr.Interface(fn=fn, inputs=inputs, outputs=outputs, **kwargs)
-
+    interface = gr.ChatInterface(fn=fn, multimodal=True)
     return interface
