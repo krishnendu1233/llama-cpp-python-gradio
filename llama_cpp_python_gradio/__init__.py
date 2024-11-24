@@ -57,11 +57,15 @@ def get_fn(model_path: str, **model_kwargs):
                 top_p=top_p,
                 repeat_penalty=repetition_penalty,
             ):
-                if chunk and "choices" in chunk:
-                    delta = chunk["choices"][0].get("delta", {}).get("content", "")
-                    if delta:
-                        response_text += delta
-                        yield response_text.strip()
+                try:
+                    if chunk and isinstance(chunk, dict) and "choices" in chunk:
+                        delta = chunk["choices"][0].get("delta", {}).get("content", "")
+                        if delta:
+                            response_text += delta
+                            yield response_text.strip()
+                except (ValueError, SyntaxError) as e:
+                    print(f"Error parsing chunk: {str(e)}")
+                    continue
             
             # Ensure we yield something if no response
             if not response_text.strip():
