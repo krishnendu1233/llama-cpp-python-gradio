@@ -8,60 +8,60 @@ import base64
 __version__ = "0.0.1"
 
 
-def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, chat_format: str = None, **model_kwargs):
-    """
-    Available chat formats:
-    - "llama-2": Llama 2 chat format
-    - "chatml": ChatML format (used by mistral/mixtral)
-    - "openchat": OpenChat format
-    - "vicuna": Vicuna chat format
-    - "openbuddy": OpenBuddy chat format
-    - "neural-chat": Intel neural chat format
-    - "zephyr": Zephyr chat format
-    - None: No chat format (use for instruction models)
-    """
-    # Initialize model once, outside the fn function
+def get_fn(model_path: str, **model_kwargs):
+    """Create a chat function with the specified model."""
+    
+    # Initialize model once
     llm = Llama(
         model_path=model_path,
-        n_ctx=2048,  # Set reasonable context window
-        **model_kwargs  # chat_format and other kwargs
+        n_ctx=8192,  # Large context window
+        n_batch=512,
+        **model_kwargs
     )
     
-    def fn(message, history):
+    def predict(
+        message: str,
+        history,
+        system_prompt: str,
+        temperature: float,
+        max_new_tokens: int,
+        top_k: int,
+        repetition_penalty: float,
+        top_p: float
+    ):
         try:
-            # Process the conversation history
+            # Format conversation with ChatML format
             messages = []
-            
-            # Add a system message first
             messages.append({
                 "role": "system",
-                "content": "You are a helpful AI assistant. Please provide direct and clear answers."
+                "content": system_prompt
             })
             
-            # Add the conversation history
+            # Add conversation history
             for user_msg, assistant_msg in history:
                 messages.append({"role": "user", "content": str(user_msg)})
-                if assistant_msg:  # Only add assistant message if it exists
+                if assistant_msg:
                     messages.append({"role": "assistant", "content": str(assistant_msg)})
             
-            # Add the current message
+            # Add current message
             messages.append({"role": "user", "content": str(message)})
 
-            # Generate the response
+            # Generate response with streaming
             response_text = ""
-            for chunk in llm.create_completion(
-                prompt=llm.tokenize(str(message)),  # Use basic completion instead
-                max_tokens=2048,
-                temperature=0.7,
-                top_p=0.95,
-                top_k=40,
-                repeat_penalty=1.1,
-                stream=True
+            for chunk in llm.create_chat_completion(
+                messages=messages,
+                stream=True,
+                temperature=temperature,
+                max_tokens=max_new_tokens,
+                top_k=top_k,
+                top_p=top_p,
+                repeat_penalty=repetition_penalty,
             ):
-                if chunk:
-                    token = chunk["choices"][0]["text"]
-                    response_text += token
-                    yield response_text.strip()
+                if chunk and "choices" in chunk:
+                    delta = chunk["choices"][0].get("delta", {}).get("content", "")
+                    if delta:
+                        response_text += delta
+                        yield response_text.strip()
             
             # Ensure we yield something if no response
             if not response_text.strip():
@@ -71,7 +71,7 @@ def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, chat_fo
             print(f"Error during generation: {str(e)}")
             yield f"An error occurred: {str(e)}"
 
-    return fn
+    return predict
 
 
 def get_image_base64(url: str, ext: str):
@@ -198,22 +198,28 @@ def get_model_path(name: str = None, model_path: str = None) -> str:
 
 
 def registry(name: str = None, model_path: str = None, **kwargs):
-    """
-    Create a Gradio Interface for a llama.cpp model.
-    """
-    model_path = get_model_path(name, model_path)
+    """Create a Gradio Interface with similar styling and parameters."""
     
-    pipeline = "chat"  # Currently only supporting chat models
-    inputs, outputs, preprocess, postprocess = get_interface_args(pipeline)
-    fn = get_fn(model_path, preprocess, postprocess, **kwargs)
+    model_path = get_model_path(name, model_path)
+    fn = get_fn(model_path, **kwargs)
 
     interface = gr.ChatInterface(
         fn=fn,
-        title="Chat with LLaMA",
-        description="Ask me anything!",
-        examples=["Hello! How are you?", "What is machine learning?"],
-        retry_btn="Retry",
-        undo_btn="Undo",
-        clear_btn="Clear",
+        title="🤖 LLaMA Chat",
+        description="Chat with a LLaMA model. Ask me anything!",
+        additional_inputs_accordion=gr.Accordion("⚙️ Parameters", open=False),
+        additional_inputs=[
+            gr.Textbox(
+                "You are a helpful AI assistant.",
+                label="System prompt"
+            ),
+            gr.Slider(0, 1, 0.7, label="Temperature"),
+            gr.Slider(128, 4096, 1024, label="Max new tokens"),
+            gr.Slider(1, 80, 40, label="Top K sampling"),
+            gr.Slider(0, 2, 1.1, label="Repetition penalty"),
+            gr.Slider(0, 1, 0.95, label="Top P sampling"),
+        ],
+        theme=gr.themes.Soft(primary_hue="blue"),
     )
+    
     return interface
