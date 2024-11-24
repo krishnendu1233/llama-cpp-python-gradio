@@ -205,8 +205,6 @@ def registry(name: str = None, model_path: str = None, **kwargs):
 
     interface = gr.ChatInterface(
         fn=fn,
-        title="🤖 LLaMA Chat",
-        description="Chat with a LLaMA model. Ask me anything!",
         additional_inputs_accordion=gr.Accordion("⚙️ Parameters", open=False),
         additional_inputs=[
             gr.Textbox(
@@ -219,7 +217,6 @@ def registry(name: str = None, model_path: str = None, **kwargs):
             gr.Slider(0, 2, 1.1, label="Repetition penalty"),
             gr.Slider(0, 1, 0.95, label="Top P sampling"),
         ],
-        theme=gr.themes.Soft(primary_hue="blue"),
     )
     
     return interface
