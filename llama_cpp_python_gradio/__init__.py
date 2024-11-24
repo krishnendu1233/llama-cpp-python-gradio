@@ -21,10 +21,12 @@ def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, **model
         
         response_text = ""
         for chunk in completion:
-            if chunk.choices[0].delta.content:
-                delta = chunk.choices[0].delta.content
-                response_text += delta
-                yield postprocess(response_text)
+            # Handle dictionary response format
+            if isinstance(chunk, dict) and 'choices' in chunk:
+                delta = chunk['choices'][0].get('delta', {}).get('content', '')
+                if delta:
+                    response_text += delta
+                    yield postprocess(response_text)
 
     return fn
 
