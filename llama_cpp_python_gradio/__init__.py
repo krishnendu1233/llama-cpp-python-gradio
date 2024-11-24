@@ -107,23 +107,24 @@ def get_model_path(name: str = None, model_path: str = None) -> str:
             try:
                 # List all files in the repo
                 from huggingface_hub import list_repo_files
-                files = list_repo_files(repo_id)
+                files = [f for f in list_repo_files(repo_id) if f.endswith('.gguf')]
                 
-                # First try to find quantized versions (Q8 preferred, then Q6, then Q4)
+                # Find best available quantization (Q8 > Q6 > Q4)
                 for prefix in ['Q8', 'Q6', 'Q4']:
-                    quantized = [f for f in files if prefix in f and f.endswith('.gguf')]
-                    if quantized:
+                    best_match = next((f for f in files if prefix in f), None)
+                    if best_match:
+                        print(f"Found {prefix} model: {best_match}")
                         return hf_hub_download(
                             repo_id=repo_id,
-                            filename=quantized[0]
+                            filename=best_match
                         )
                 
-                # Fallback to any .gguf file
-                gguf_files = [f for f in files if f.endswith('.gguf')]
-                if gguf_files:
+                # Fallback to first available .gguf file if no quantized version found
+                if files:
+                    print(f"No quantized version found, using: {files[0]}")
                     return hf_hub_download(
                         repo_id=repo_id,
-                        filename=gguf_files[0]
+                        filename=files[0]
                     )
                     
                 raise ValueError(f"Could not find any GGUF model file in repository {repo_id}")
