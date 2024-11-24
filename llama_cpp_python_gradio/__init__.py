@@ -13,15 +13,24 @@ def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, **model
         inputs = preprocess(message, history)
         llm = Llama(model_path=model_path, **model_kwargs)
         
+        # Add a system message if not present
+        if not inputs["messages"] or inputs["messages"][0]["role"] != "system":
+            inputs["messages"].insert(0, {
+                "role": "system",
+                "content": "You are a helpful AI assistant. Please provide direct and clear answers."
+            })
+        
         # Create chat completion with streaming
         completion = llm.create_chat_completion(
             messages=inputs["messages"],
-            stream=True
+            stream=True,
+            chat_format="chatml",  # Use chatml format which matches the <|im_start|> format
+            temperature=0.7,
+            stop=["<|im_end|>"]  # Add explicit stop token
         )
         
         response_text = ""
         for chunk in completion:
-            # Handle dictionary response format
             if isinstance(chunk, dict) and 'choices' in chunk:
                 delta = chunk['choices'][0].get('delta', {}).get('content', '')
                 if delta:
