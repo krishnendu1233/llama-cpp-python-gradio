@@ -23,30 +23,53 @@ def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, chat_fo
     # Initialize model once, outside the fn function
     llm = Llama(
         model_path=model_path,
-        chat_format=chat_format,
-        **model_kwargs
+        n_ctx=2048,  # Set reasonable context window
+        **model_kwargs  # chat_format and other kwargs
     )
     
     def fn(message, history):
-        inputs = preprocess(message, history)
-        
-        # Create chat completion with streaming
-        completion = llm.create_chat_completion(
-            messages=inputs["messages"],
-            stream=True,
-            temperature=0.7,
-            top_p=0.95,
-            top_k=40,
-            repeat_penalty=1.1
-        )
-        
-        response_text = ""
-        for chunk in completion:
-            if isinstance(chunk, dict) and 'choices' in chunk:
-                delta = chunk['choices'][0].get('delta', {}).get('content', '')
-                if delta:
-                    response_text += delta
-                    yield postprocess(response_text)
+        try:
+            # Process the conversation history
+            messages = []
+            
+            # Add a system message first
+            messages.append({
+                "role": "system",
+                "content": "You are a helpful AI assistant. Please provide direct and clear answers."
+            })
+            
+            # Add the conversation history
+            for user_msg, assistant_msg in history:
+                messages.append({"role": "user", "content": str(user_msg)})
+                if assistant_msg:  # Only add assistant message if it exists
+                    messages.append({"role": "assistant", "content": str(assistant_msg)})
+            
+            # Add the current message
+            messages.append({"role": "user", "content": str(message)})
+
+            # Generate the response
+            response_text = ""
+            for chunk in llm.create_completion(
+                prompt=llm.tokenize(str(message)),  # Use basic completion instead
+                max_tokens=2048,
+                temperature=0.7,
+                top_p=0.95,
+                top_k=40,
+                repeat_penalty=1.1,
+                stream=True
+            ):
+                if chunk:
+                    token = chunk["choices"][0]["text"]
+                    response_text += token
+                    yield response_text.strip()
+            
+            # Ensure we yield something if no response
+            if not response_text.strip():
+                yield "I apologize, but I was unable to generate a response. Please try again."
+                
+        except Exception as e:
+            print(f"Error during generation: {str(e)}")
+            yield f"An error occurred: {str(e)}"
 
     return fn
 
@@ -177,11 +200,6 @@ def get_model_path(name: str = None, model_path: str = None) -> str:
 def registry(name: str = None, model_path: str = None, **kwargs):
     """
     Create a Gradio Interface for a llama.cpp model.
-
-    Parameters:
-        - name (str, optional): Name of the model to load
-        - model_path (str, optional): Path to the GGUF model file
-        - kwargs: Additional arguments passed to Llama constructor
     """
     model_path = get_model_path(name, model_path)
     
@@ -189,5 +207,13 @@ def registry(name: str = None, model_path: str = None, **kwargs):
     inputs, outputs, preprocess, postprocess = get_interface_args(pipeline)
     fn = get_fn(model_path, preprocess, postprocess, **kwargs)
 
-    interface = gr.ChatInterface(fn=fn, multimodal=True)
+    interface = gr.ChatInterface(
+        fn=fn,
+        title="Chat with LLaMA",
+        description="Ask me anything!",
+        examples=["Hello! How are you?", "What is machine learning?"],
+        retry_btn="Retry",
+        undo_btn="Undo",
+        clear_btn="Clear",
+    )
     return interface
