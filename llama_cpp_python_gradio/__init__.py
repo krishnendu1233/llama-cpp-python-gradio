@@ -5,7 +5,7 @@ import gradio as gr
 from typing import Callable
 import base64
 
-__version__ = "0.0.3"
+__version__ = "0.0.1"
 
 
 def get_fn(model_path: str, preprocess: Callable, postprocess: Callable, **model_kwargs):
