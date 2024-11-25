@@ -12,23 +12,27 @@ pip install llama-cpp-python-gradio
 
 # Basic Usage
 
-First, you'll need a GGUF model file for llama.cpp. Then in a Python file, write:
+You'll need a GGUF model file for llama.cpp. The easiest way is to use a Hugging Face model repository:
 
 ```python
 import gradio as gr
 import llama_cpp_python_gradio
 
+# Using a Hugging Face model repository
 gr.load(
-    model_path='path/to/your/model.gguf',
+    name='TheBloke/Llama-2-7B-Chat-GGUF',  # Will automatically select best quantized version
     src=llama_cpp_python_gradio.registry,
 ).launch()
 ```
 
-Run the Python file, and you should see a Gradio Interface connected to your local llama.cpp model!
+While you can technically use a local model path, it's recommended to use Hugging Face repositories as they provide:
+- Automatic selection of the best available quantization (Q8 > Q6 > Q4)
+- Easy model versioning and updates
+- Verified model compatibility
 
 # Customization 
 
-You can customize the interface by passing additional arguments to the Llama constructor:
+You can customize the interface by passing additional model parameters:
 
 ```python
 import gradio as gr
@@ -37,16 +41,29 @@ import llama_cpp_python_gradio
 gr.load(
     model_path='path/to/your/model.gguf',
     src=llama_cpp_python_gradio.registry,
-    n_ctx=2048,  # context window size
-    n_gpu_layers=1  # number of layers to offload to GPU
+    n_ctx=8192,      # context window size (default)
+    n_batch=512,     # batch size (default)
+    # ... other llama.cpp parameters
 ).launch()
 ```
 
+The interface includes several adjustable parameters:
+- System prompt (default: "You are a helpful AI assistant.")
+- Temperature (0-1, default: 0.7)
+- Max new tokens (128-4096, default: 1024)
+- Top K sampling (1-80, default: 40)
+- Repetition penalty (0-2, default: 1.1)
+- Top P sampling (0-1, default: 0.95)
+
 # Under the Hood
 
-The `llama-cpp-python-gradio` library has two main dependencies: `llama-cpp-python` and `gradio`. It provides a "registry" function that creates a Gradio ChatInterface connected to your local llama.cpp model.
+The `llama-cpp-python-gradio` library combines `llama-cpp-python` and `gradio` to create a chat interface. Key features include:
 
-The interface supports both text and image inputs (for multimodal models), with automatic handling of file uploads and base64 encoding.
+- Automatic model downloading from Hugging Face (with smart quantization selection)
+- ChatML-formatted conversation handling
+- Streaming responses
+- Support for both text and image inputs (for multimodal models)
+- Configurable generation parameters through the UI
 
 -------
 
